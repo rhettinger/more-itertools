@@ -42,6 +42,7 @@ from .recipes import (
     unique_everseen,
     all_equal,
     batched,
+    loops,
 )
 
 __all__ = [
@@ -3724,9 +3725,7 @@ def _sample_counted(population, k, counts, strict):
         return element
 
     with suppress(StopIteration):
-        reservoir = []
-        for _ in range(k):
-            reservoir.append(feed(0))
+        reservoir = [feed(0) for _ in loops(k)]
         if strict and len(reservoir) < k:
             raise ValueError('Sample larger than population')
 

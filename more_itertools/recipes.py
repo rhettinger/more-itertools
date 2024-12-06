@@ -1113,7 +1113,7 @@ def _strong_probable_prime(n, base):
     if x == 1 or x == n - 1:
         return True
 
-    for _ in range(s - 1):
+    for _ in loops(s - 1):
         x = x * x % n
         if x == n - 1:
             return True
@@ -1145,7 +1145,7 @@ def is_prime(n):
         if n < limit:
             break
     else:
-        bases = [randrange(2, n - 1) for i in range(32)]
+        bases = [randrange(2, n - 1) for _ in loops(32)]
     return all(_strong_probable_prime(n, base) for base in bases)
 
 
