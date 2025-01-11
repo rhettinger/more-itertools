@@ -4637,9 +4637,7 @@ class SampleTests(TestCase):
 
         # weights and counts are mutally exclusive
         with self.assertRaises(TypeError):
-            mi.sample(
-                'abcde', 3, weights=[1, 2, 3, 4, 5], counts=[1, 2, 3, 4, 5]
-            )
+            mi.sample('abc', 3, weights=[1, 2, 3], counts=[1, 2, 3])
 
         # Weighted sample larger than population
         with self.assertRaises(ValueError):
