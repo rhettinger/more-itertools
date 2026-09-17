@@ -791,6 +791,33 @@ class OneTests(TestCase):
             lambda: mi.one(it),
         )
 
+    def test_falsy_custom_exception(self):
+        # An exception whose instances are falsy must still be raised, rather
+        # than being treated as "no custom exception given".
+        class FalsyError(Exception):
+            def __bool__(self):
+                return False
+
+        too_long = FalsyError('too many')
+        self.assertRaises(
+            FalsyError, lambda: mi.one(count(), too_long=too_long)
+        )
+
+        too_short = FalsyError('too few')
+        self.assertRaises(FalsyError, lambda: mi.one([], too_short=too_short))
+
+    def test_too_long_does_not_evaluate_repr(self):
+        # When too_long is given, the default message (which reprs the first two
+        # items) should never be built.
+        class NoRepr:
+            def __repr__(self):
+                raise RuntimeError('repr should not be called')
+
+        it = (NoRepr() for _ in count())
+        self.assertRaises(
+            OverflowError, lambda: mi.one(it, too_long=OverflowError)
+        )
+
 
 class IntersperseTest(TestCase):
     """Tests for intersperse()"""
@@ -1081,6 +1108,38 @@ class BucketTests(TestCase):
         self.assertEqual(list(D[10]), [10, 11, 12])
         self.assertEqual(list(D[20]), [])
         self.assertEqual(list(D[30]), [30, 31, 33])
+
+    def test_in_does_not_add_key(self):
+        # A failed membership test must not invent a key (see #1284)
+        iterable = [10, 20, 11, 21]
+        D = mi.bucket(iterable, key=lambda x: 10 * (x // 10))
+        self.assertFalse(30 in D)
+        self.assertEqual(set(D), {10, 20})
+        self.assertEqual(list(D[30]), [])
+
+    def test_getitem_miss_does_not_add_key(self):
+        # Selecting an absent bucket must not invent a key either
+        iterable = [10, 20, 11, 21]
+        D = mi.bucket(iterable, key=lambda x: 10 * (x // 10))
+        self.assertEqual(list(D[30]), [])
+        self.assertEqual(set(D), {10, 20})
+
+    def test_in_does_not_add_key_with_validator(self):
+        # A key the validator accepts but the iterable never produces
+        iterable = [10, 20, 11, 21]
+        key = lambda x: 10 * (x // 10)
+        validator = lambda x: x in {10, 20, 30}
+        D = mi.bucket(iterable, key, validator=validator)
+        self.assertFalse(30 in D)
+        self.assertEqual(set(D), {10, 20})
+
+    def test_keys_are_only_those_seen(self):
+        # Every reported key must have had at least one matching item
+        iterable = [10, 20, 11]
+        D = mi.bucket(iterable, key=lambda x: 10 * (x // 10))
+        for missing in (30, 40, 50):
+            self.assertFalse(missing in D)
+        self.assertEqual(set(D), {10, 20})
 
 
 class SpyTests(TestCase):
@@ -3126,6 +3185,25 @@ class NumericRangeTests(TestCase):
         ]:
             self.assertEqual(expected, list(reversed(mi.numeric_range(*args))))
 
+    def test_reversed_preserves_float_values(self):
+        for args in [
+            (0.0, 1.0, 0.1),
+            (1.0, 0.0, -0.1),
+            (0.1, 0.5, 0.1),
+        ]:
+            with self.subTest(args=args):
+                values = mi.numeric_range(*args)
+                self.assertEqual(list(values)[::-1], list(reversed(values)))
+
+    def test_reversed_datetime_limits(self):
+        for start, step in [
+            (datetime.min, timedelta(days=1)),
+            (datetime.max, -timedelta(days=1)),
+        ]:
+            with self.subTest(start=start, step=step):
+                values = mi.numeric_range(start, start + 2 * step, step)
+                self.assertEqual(list(values)[::-1], list(reversed(values)))
+
     def test_count(self):
         for args, v, c in [
             ((7.0,), 0.0, 1),
@@ -4383,6 +4461,28 @@ class OnlyTests(TestCase):
             "Expected exactly one item in iterable, "
             "but got 'foo', 'bar', and perhaps more",
             lambda: mi.only(['foo', 'bar', 'baz']),
+        )
+
+    def test_falsy_custom_exception(self):
+        class FalsyError(Exception):
+            def __bool__(self):
+                return False
+
+        too_long = FalsyError('too many')
+        self.assertRaises(
+            FalsyError, lambda: mi.only([1, 2], too_long=too_long)
+        )
+
+    def test_too_long_does_not_evaluate_repr(self):
+        class NoRepr:
+            def __repr__(self):
+                raise RuntimeError('repr should not be called')
+
+        self.assertRaises(
+            OverflowError,
+            lambda: mi.only(
+                [NoRepr(), NoRepr(), NoRepr()], too_long=OverflowError
+            ),
         )
 
 

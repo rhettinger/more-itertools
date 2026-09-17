@@ -658,13 +658,16 @@ def one(iterable, too_short=None, too_long=None):
     iterator = iter(iterable)
     for first in iterator:
         for second in iterator:
-            msg = (
+            if too_long is not None:
+                raise too_long
+            raise ValueError(
                 f'Expected exactly one item in iterable, but got {first!r}, '
                 f'{second!r}, and perhaps more.'
             )
-            raise too_long or ValueError(msg)
         return first
-    raise too_short or ValueError('too few items in iterable (expected 1)')
+    if too_short is not None:
+        raise too_short
+    raise ValueError('too few items in iterable (expected 1)')
 
 
 def raise_(exception, *args):
@@ -1203,7 +1206,7 @@ class bucket:
         while True:
             # If we've cached some items that match the target value, emit
             # the first one and evict it from the cache.
-            if self._cache[value]:
+            if self._cache.get(value):
                 yield self._cache[value].popleft()
             # Otherwise we need to advance the parent iterator to search for
             # a matching item, caching the rest.
@@ -1215,6 +1218,8 @@ class bucket:
                         return
                     item_value = self._key(item)
                     if item_value == value:
+                        if value not in self._cache:
+                            self._cache[value] = deque()
                         yield item
                         break
                     elif self._validator(item_value):
@@ -2450,15 +2455,10 @@ class numeric_range(Sequence):
         )
 
     def __reversed__(self):
-        # Empty iterator
-        try:
-            start = self._get_by_index(-1)
-        except IndexError:
-            return iter([])
-
-        return iter(
-            numeric_range(start, self._start - self._step, -self._step)
-        )
+        start = self._start
+        step = self._step
+        for i in reversed(range(self._len)):
+            yield start + i * step
 
     def count(self, value):
         return int(value in self)
@@ -3681,11 +3681,12 @@ def only(iterable, default=None, too_long=None):
     iterator = iter(iterable)
     for first in iterator:
         for second in iterator:
-            msg = (
+            if too_long is not None:
+                raise too_long
+            raise ValueError(
                 f'Expected exactly one item in iterable, but got {first!r}, '
                 f'{second!r}, and perhaps more.'
             )
-            raise too_long or ValueError(msg)
         return first
     return default
 
